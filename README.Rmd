@@ -1,0 +1,22 @@
+---
+title: "Midterm"
+author: "Lin Wang"
+date: "10/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library
+```
+# Introduction
+
+# Methods
+
+# Preliminary Results
+
+# Conclusion
+```{r}
+
+```
+
