@@ -17,7 +17,8 @@ library(ggplot2)
 # Get CA covid history data
 dat <- data.table::fread("/Users/Hope/Documents/PM566-Midterm/california-history.csv")
 
-dat <- dat[, .(date, state, death, deathIncrease, hospitalizedCurrently, hospitalizedIncrease, positive, positiveIncrease, totalTestResults)]
+dat <- dat[, .(date, state, death, deathIncrease, hospitalizedCurrently, positive, positiveIncrease, totalTestResults)] %>%
+  rename(hospitalized = hospitalizedCurrently, newcases = positiveIncrease, cases = positive, tests = totalTestResults)
 
 dat$date <- as.Date(dat$date)
 
@@ -40,23 +41,24 @@ counties$date <- as.Date(counties$date)
 
 ```{r}
 # Overview of covid tests, deaths, hospitalizedIncrease, new cases in CA
-ggplot(dat, mapping = aes(x = date, y = positive))+
+ggplot(dat, mapping = aes(x = date, y = cases))+
   geom_line(color="red")+
-  ggtitle("Total tested positive in California")+
+  ggtitle("Total positive cases in California")+
   theme_bw()
 
 ggplot(dat)+
-  geom_line(mapping = aes(x = date, y = death), na.rm = TRUE)+
+  geom_line(mapping = aes(x = date, y = death), col = "darkred", na.rm = TRUE)+
   ggtitle("Total deaths in California")+
   theme_bw()
 
 ggplot(dat)+
-  geom_point(mapping = aes(x = date, y = hospitalizedCurrently), na.rm = TRUE, col="#69b3a2")+
-  ggtitle("Increased hospitalized cases in California")+
+  geom_point(mapping = aes(x = date, y = hospitalized), na.rm = TRUE, col="skyblue", alpha = 0.5)+
+  ggtitle("Hospitalized cases in California")+
   theme_classic()
 
 ggplot(dat, mapping = aes(x = date))+
-  geom_bar(aes(y = positiveIncrease), position = "stack", stat = "identity", na.rm = TRUE, col="#69b3a2")+
+  geom_bar(aes(y = newcases), position = "stack", stat = "identity", col="#69b3a2", show.legend = TRUE, na.rm = TRUE)+
+  stat_smooth(aes(date, newcases), method = "gam", color = "red", size = 0.5, se = FALSE)+
   ggtitle("New cases in California")+
   theme_classic()
 ```
@@ -64,32 +66,90 @@ ggplot(dat, mapping = aes(x = date))+
 ```{r}
 # New cases by quarters
 ggplot(covid_ca)+
-  geom_boxplot(mapping = aes(group = Quarter, y = positiveIncrease, color = Quarter, fill = Quarter, alpha = 0.5))+
+  geom_boxplot(mapping = aes(group = Quarter, y = newcases, color = Quarter, fill = Quarter, alpha = 0.5))+
   ggtitle("New cases in California by quarters")+
   theme_classic()
 
 # Take a look at different month
 covid_ca1 = mutate(covid_ca, month=substr(covid_ca$date, 6, 7))
 ggplot(covid_ca1)+
-  geom_point(mapping = aes(x = date, y = positiveIncrease, color = month))+
+  geom_point(mapping = aes(x = date, y = newcases, color = month))+
+  stat_smooth(aes(x = date, y = newcases, color = month), method = lm, se = FALSE)+
   ggtitle("New cases in California by month")+
+  theme_classic()
+
+#
+ggplot(covid_ca1, mapping = aes(x = month, y = newcases))+
+  stat_summary(fun.data = "mean_sdl")+
+  ggtitle("Statistical summary graphs of new cases by month")+
   theme_bw()
 ```
 
 ```{r}
+# Getting the counties with top ten cases and deaths
+top_cases <- counties %>%
+  filter(date == max(date)) %>%
+  select(county, cases) %>%
+  arrange(desc(cases))
+top_10_cases <- top_cases[1:10,]
 
+top_deaths <- counties %>%
+  filter(date == max(date)) %>%
+  select(county, deaths) %>%
+  arrange(desc(deaths))
+top_10_deaths <- top_deaths[1:10,]
 
-ggplot(counties)+
-  geom_line(mapping = aes(x = date, y = cases, color = factor(county)))
+ggplot(top_10_cases, aes(x = reorder(county, -cases)))+
+  geom_bar(aes(y = cases), position = "stack", stat = "identity", fill = "skyblue")+
+  labs(title = "Counties in CA with top ten cases", x = "County", y = "Cases")+
+  theme_bw()
+
+ggplot(top_10_deaths, aes(x = reorder(county, -deaths)))+
+  geom_bar(aes(y = deaths), position = "stack", stat = "identity", fill = "salmon")+
+  labs(title = "Counties in CA with top ten deaths", x = "County", y = "Deaths")+
+  theme_bw()
+```
+
+```{r}
+library(usmap)
+map <- counties %>%
+  filter(date == max(date)) %>%
+  select(fips, cases, deaths)
+
+plot_usmap("counties", data = map, values = "cases", include = "CA")+
+  scale_fill_continuous(low = "white", high = "coral")+
+  labs(title = "Covid cases across California", fill = "cases")
+
+plot_usmap("counties", data = map, values = "deaths", include = "CA")+
+  scale_fill_continuous(low = "white", high = "darkred")+
+  labs(title = "Covid deaths across California", fill = "deaths")
+```
+
+```{r Los Angeles County}
+lac <- counties %>%
+  filter(county == "Los Angeles") %>%
+  mutate(newcases = cases - lag(cases, 1), newdeaths = deaths - lag(deaths, 1))
+
+ggplot(lac)+
+  geom_line(mapping = aes(x = date, y = newcases, color = "newcases"), position = "stack", size = 0.7, na.rm = TRUE)+
+  stat_smooth(aes(date, newcases), method = "gam", color = "red", size = 0.5, se = FALSE)+
+  geom_line(mapping = aes(x = date, y = deaths, color = "deaths"), size = 0.7, na.rm = TRUE)+
+  stat_smooth(aes(x = date, y = deaths), size = 0.5)+
+  ggtitle("New cases and deaths in LA County")+
+  theme_bw()
 ```
 
 # Methods
 
 # Preliminary Results
+```{r}
+knitr::kable(
+  list(top_10_cases, top_10_deaths),
+  caption = 'Counties with top ten cases and deaths.',
+  booktabs = TRUE, valign = 't'
+)
+```
 
 # Conclusion
-```{r}
-library(usmap)
 
-```
 
