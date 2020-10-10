@@ -3,69 +3,121 @@ Midterm
 Lin Wang
 10/7/2020
 
-# Introduction
+You can view the report
+[here](https://ghcdn.rawgit.org/HopeW233/PM566-Midterm/master/README.html)
+
+## Introduction
+
+### 1\. Dataset
+
+The datasets I used are:
+
+California daily covid data from
+<https://covidtracking.com/data/download>
+
+Covid data per US counties by NYT
+<https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv>
+
+Both datasets include daily covid data such as cases, deaths, new cases,
+etc. California data starts from 03/04/2020, and county data starts from
+01/21/2020.
+
+### 2\. Formulated question
+
+I am going to look at California covid cases and trends. The main
+questions for this project are:
+
+1.  Which day has the most number of new cases and new deaths?
+
+2.  What is the trend of daily new cases?
+
+3.  What is the difference of covid trend between 2nd quarter and 3th
+    quarter?
+
+4.  Which county has the most number of cases and deaths?
+
+## Methods
+
+### 1\. Read in the data, EDA
+
+  - I choose data.table:: to download and read in large dataset, in
+    order to keep latest covid history, I use download.file() and
+    fread() to get updated daily data from the website.
+
+  - First I follow the EDA checklist to check dimensions, headers,
+    footers, variable names and variable types. CA history data has 43
+    columns and 220 rows with IDate, int, char, logi variables, the
+    first observation was on 03/04/2020. While county data has 6 columns
+    and 612238 rows with IDate, chr, int variables(10/9), the first
+    observation was on 01/21/2020.
+
+<!-- end list -->
 
 ``` r
-# Get CA covid history data
-dat <- data.table::fread("/Users/Hope/Documents/PM566-Midterm/california-history.csv")
+# Getting CA covid history data
+download.file("https://covidtracking.com/data/download/california-history.csv", destfile = "california-history.csv")
+dat <- fread("california-history.csv")
 
+# Getting covid data per county in CA
+download.file("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv", destfile = "us-counties.csv", method="libcurl", timeout = 60)
+counties <- fread("us-counties.csv")
+```
+
+### 2\. Create new column, rename the key variables, convert variable type, check any missing values
+
+  - Next, datasets are filtered and selected using data.table:: and
+    dplyr::. I list needed variables and rename some of them, and create
+    a quarter variable in CA history data by selecting data from
+    04/01/2020 - 09/30/2020. And I filter county data where state equals
+    to CA. I also convert type of the date variable for further use. As
+    for missing value, I keep some NA’s in death and new cases columns
+    because it would not affect our analysis.
+
+  - Now I get two datasets named as covid\_ca and counties, I’ll use
+    summary(), count(), table() to explore variable features and summary
+    statistics.
+
+<!-- end list -->
+
+``` r
+# selecting columns we need
 dat <- dat[, .(date, state, death, deathIncrease, hospitalizedCurrently, positive, positiveIncrease, totalTestResults)] %>%
   rename(hospitalized = hospitalizedCurrently, newcases = positiveIncrease, cases = positive, tests = totalTestResults)
 
 dat$date <- as.Date(dat$date)
 
-# Create Quarter variable
+# Creating Quarter variable
 dat[date>="2020-04-01" & date<="2020-06-30", Quarter := "Q1"]
 dat[date>="2020-07-01" & date<="2020-09-30", Quarter := "Q2"]
 
-covid_ca <- dat[date>="2020-04-01" & date<="2020-09-30"] 
-covid_ca[order(date, decreasing = FALSE)]
-```
+covid_ca <- dat[date>="2020-04-01" & date<="2020-09-30"][order(date, decreasing = FALSE)]
 
-    ##            date state death deathIncrease hospitalized  cases newcases    tests
-    ##   1: 2020-04-01    CA   171            18         1855   8155      673    29927
-    ##   2: 2020-04-02    CA   203            32         1922   9191     1036    33000
-    ##   3: 2020-04-03    CA   237            34         2188  10701     1510    35300
-    ##   4: 2020-04-04    CA   276            39         2300  12026     1325   113700
-    ##   5: 2020-04-05    CA   319            43         2398  13438     1412   116533
-    ##  ---                                                                           
-    ## 179: 2020-09-26    CA 15532           134         3203 798237     4197 14182730
-    ## 180: 2020-09-27    CA 15587            55         3129 802308     4071 14333498
-    ## 181: 2020-09-28    CA 15608            21         3160 805263     2955 14484852
-    ## 182: 2020-09-29    CA 15640            32         3223 807425     2162 14613545
-    ## 183: 2020-09-30    CA 15792           152         3267 810625     3200 14705202
-    ##      Quarter
-    ##   1:      Q1
-    ##   2:      Q1
-    ##   3:      Q1
-    ##   4:      Q1
-    ##   5:      Q1
-    ##  ---        
-    ## 179:      Q2
-    ## 180:      Q2
-    ## 181:      Q2
-    ## 182:      Q2
-    ## 183:      Q2
-
-``` r
-# Get covid data of counties in CA
-download.file("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv", "us-counties.csv")
-counties <- fread("us-counties.csv")
+# Filtering CA data
 counties <- counties %>%
   filter(state == "California")
 
 counties$date <- as.Date(counties$date)
 ```
 
+### 3\. Data visualization
+
+  - The tools I use to visualized data mainly are ggplot() with multiple
+    types of plot, usmap:: to present state map, kable() to make
+    well-organized tables.
+
+## Preliminary Results
+
+### 1\. Overview of covid cases, deaths, hospitalized cases, new cases in CA
+
 ``` r
-# Overview of covid tests, deaths, hospitalizedIncrease, new cases in CA
-ggplot(dat, mapping = aes(x = date, y = cases))+
-  geom_line(color="red")+
-  ggtitle("Total positive cases in California")+
+ggplot(dat)+
+  geom_line(mapping = aes(x = date, y = cases), col="red", na.rm = TRUE)+
+  geom_line(mapping = aes(x = date, y = death), col = "darkred", na.rm = TRUE)+
+  ggtitle("Total cases and deaths in California")+
   theme_bw()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+![](README_files/figure-gfm/overview-1.png)<!-- -->
 
 ``` r
 ggplot(dat)+
@@ -74,7 +126,7 @@ ggplot(dat)+
   theme_bw()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-1-2.png)<!-- -->
+![](README_files/figure-gfm/overview-2.png)<!-- -->
 
 ``` r
 ggplot(dat)+
@@ -83,7 +135,7 @@ ggplot(dat)+
   theme_classic()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-1-3.png)<!-- -->
+![](README_files/figure-gfm/overview-3.png)<!-- -->
 
 ``` r
 ggplot(dat, mapping = aes(x = date))+
@@ -93,9 +145,15 @@ ggplot(dat, mapping = aes(x = date))+
   theme_classic()
 ```
 
-    ## `geom_smooth()` using formula 'y ~ s(x, bs = "cs")'
+![](README_files/figure-gfm/overview-4.png)<!-- -->
 
-![](README_files/figure-gfm/unnamed-chunk-1-4.png)<!-- -->
+  - The updated total cases and deaths are 838606 and 16428, they share
+    a similar increasing trend by date.
+  - Cases hospitalized plot has a peak on early April and late July.
+  - New cases plot has a sharp increase on July, and is getting
+    decreased after the peak.
+
+### 2\. Covid trend by quarters and months
 
 ``` r
 # New cases by quarters
@@ -105,7 +163,7 @@ ggplot(covid_ca)+
   theme_classic()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](README_files/figure-gfm/trend%20by%20quarters-1.png)<!-- -->
 
 ``` r
 # Take a look at different month
@@ -117,19 +175,29 @@ ggplot(covid_ca1)+
   theme_classic()
 ```
 
-    ## `geom_smooth()` using formula 'y ~ x'
-
-![](README_files/figure-gfm/unnamed-chunk-2-2.png)<!-- -->
+![](README_files/figure-gfm/trend%20by%20quarters-2.png)<!-- -->
 
 ``` r
-#
+# Statistical summary graph
 ggplot(covid_ca1, mapping = aes(x = month, y = newcases))+
   stat_summary(fun.data = "mean_sdl")+
   ggtitle("Statistical summary graphs of new cases by month")+
   theme_bw()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-2-3.png)<!-- -->
+![](README_files/figure-gfm/trend%20by%20quarters-3.png)<!-- -->
+
+  - The 3th quarter(mean new\_cases: 5000+) has more new cases than 2nd
+    quarter(mean new\_cases: 2500-).
+  - New cases is increasing drastically on June and get the top on July,
+    it has a decreasing trend on the beginning of the August, which
+    suggests precautions such as wearing mask and social distancing have
+    impact on covid spread prevention. Overall, 3th quarter has more new
+    cases.
+  - Statistical summary graph show same results with plots, July and
+    August have most new cases.
+
+### 3\. County with top cases and deaths
 
 ``` r
 # Getting the counties with top ten cases and deaths
@@ -145,13 +213,14 @@ top_deaths <- counties %>%
   arrange(desc(deaths))
 top_10_deaths <- top_deaths[1:10,]
 
+# plot
 ggplot(top_10_cases, aes(x = reorder(county, -cases)))+
   geom_bar(aes(y = cases), position = "stack", stat = "identity", fill = "skyblue")+
   labs(title = "Counties in CA with top ten cases", x = "County", y = "Cases")+
   theme_bw()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](README_files/figure-gfm/top%20ten%20counties-1.png)<!-- -->
 
 ``` r
 ggplot(top_10_deaths, aes(x = reorder(county, -deaths)))+
@@ -160,9 +229,14 @@ ggplot(top_10_deaths, aes(x = reorder(county, -deaths)))+
   theme_bw()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
+![](README_files/figure-gfm/top%20ten%20counties-2.png)<!-- -->
+
+  - Los Angeles is the county with the most number of cases and deaths.
+
+<!-- end list -->
 
 ``` r
+# Plotting a state map
 library(usmap)
 map <- counties %>%
   filter(date == max(date)) %>%
@@ -173,7 +247,7 @@ plot_usmap("counties", data = map, values = "cases", include = "CA")+
   labs(title = "Covid cases across California", fill = "cases")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](README_files/figure-gfm/usmap-1.png)<!-- -->
 
 ``` r
 plot_usmap("counties", data = map, values = "deaths", include = "CA")+
@@ -181,12 +255,15 @@ plot_usmap("counties", data = map, values = "deaths", include = "CA")+
   labs(title = "Covid deaths across California", fill = "deaths")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-4-2.png)<!-- -->
+![](README_files/figure-gfm/usmap-2.png)<!-- -->
+
+### 4\. Take a look at Los Angeles County
 
 ``` r
 lac <- counties %>%
   filter(county == "Los Angeles") %>%
-  mutate(newcases = cases - lag(cases, 1), newdeaths = deaths - lag(deaths, 1))
+  mutate(newcases = cases - lag(cases, 1)) %>%
+  arrange(desc(cases))
 
 ggplot(lac)+
   geom_line(mapping = aes(x = date, y = newcases, color = "newcases"), position = "stack", size = 0.7, na.rm = TRUE)+
@@ -197,21 +274,64 @@ ggplot(lac)+
   theme_bw()
 ```
 
-    ## `geom_smooth()` using formula 'y ~ s(x, bs = "cs")'
-
-    ## Warning: Removed 1 rows containing non-finite values (stat_smooth).
-
-    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
-
-    ## Warning: Removed 1 rows containing missing values (position_stack).
-
 ![](README_files/figure-gfm/Los%20Angeles%20County-1.png)<!-- -->
 
-# Methods
+  - The deaths line has a linear trend after April, the new cases line
+    share a similar trend with state level.
 
-# Preliminary Results
+### 5\. Tables
 
 ``` r
+# Getting the day with the most number of new cases and new deaths
+newcases <- dat %>%
+  filter(newcases == max(newcases)) %>%
+  select(date, newcases) 
+
+deaths <- dat %>%
+  filter(deathIncrease == max(deathIncrease)) %>%
+  select(date, deathIncrease) 
+
+knitr::kable(
+  list(newcases, deaths),
+  caption = "Day with the most number of new cases and deaths")
+```
+
+<table class="kable_wrapper">
+
+<caption>
+
+Day with the most number of new cases and deaths
+
+</caption>
+
+<tbody>
+
+<tr>
+
+<td>
+
+| date       | newcases |
+| :--------- | -------: |
+| 2020-07-22 |    12807 |
+
+</td>
+
+<td>
+
+| date       | deathIncrease |
+| :--------- | ------------: |
+| 2020-08-01 |           219 |
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+``` r
+# Getting counties with top ten cases and deaths
 knitr::kable(
   list(top_10_cases, top_10_deaths),
   caption = 'Counties with top ten cases and deaths.',
@@ -271,4 +391,44 @@ Counties with top ten cases and deaths.
 
 </table>
 
-# Conclusion
+``` r
+# Latest summary
+dat[!is.na(cases), positiveprop := cases/tests]
+latest <- dat[1, .(date, state, death, deathIncrease, hospitalized, cases, newcases, tests, positiveprop)]
+
+knitr::kable(x = latest, caption = "Latest Covid Summary in CA")
+```
+
+| date       | state | death | deathIncrease | hospitalized |  cases | newcases |    tests | positiveprop |
+| :--------- | :---- | ----: | ------------: | -----------: | -----: | -------: | -------: | -----------: |
+| 2020-10-09 | CA    | 16428 |            67 |         3186 | 838606 |     3806 | 15736497 |    0.0532905 |
+
+Latest Covid Summary in CA
+
+``` r
+lat_lac <- lac[1, .(date, county, cases, deaths, newcases)]
+knitr::kable(x = lat_lac, caption = "Latest Covid Summary in LAC")
+```
+
+| date       | county      |  cases | deaths | newcases |
+| :--------- | :---------- | -----: | -----: | -------: |
+| 2020-10-08 | Los Angeles | 278665 |   6726 |     1220 |
+
+Latest Covid Summary in LAC
+
+## Conclusion
+
+  - 07/22/2020 is the day has the most new cases and 08/01/2020 has the
+    most new deaths in CA.
+
+  - Daily new cases is increasing sharply on June, and has a peak at
+    July and August, now it is decreasing gradually.
+
+  - The 3th quarter has more new cases than the 2nd quarter, and it has
+    a mean of new cases at 5000+.
+
+  - Los Angeles county has the most number of cases and deaths which is
+    278665 and 6726 respectively.
+
+  - Covid pattern may be affected by people’s behavior and public health
+    orders, that’s what I’m interested and may analyze it later.
